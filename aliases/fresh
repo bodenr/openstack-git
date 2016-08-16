@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# A git alias (cmd) to clean-up local git branches.
+# When run without any args, all branches except master and the current branch
+# are deleted. When run with a branch name, all branches except master and
+# said branch are deleted. If the current branch is master, master will also
+# be pulled.
+# This alias can be useful, for example, after reviewing a number of changes and
+# wanting to delete all the review branches to clean-up the local repo.
+
+master_ref='refs/heads/master'
+skip_branches=(${master_ref})
+
+
+_set_curr_branch() {
+    curr_branch_name="$(git symbolic-ref HEAD 2>/dev/null)" || (echo "Can't work with DETACHED head." && exit 1)
+}
+
+_freshen() {
+    for branch in $(git for-each-ref --format='%(refname)' refs/heads/); do
+        skip=0
+        for skip_branch in ${skip_branches[@]}; do
+            if [ ${skip_branch} == ${branch} ]; then
+                skip=1
+                break
+            fi
+        done
+        if [ ${skip} -eq 0 ]; then
+            git update-ref -d ${branch} || (echo "Failed to delete branch '${branch}'." && exit 2)
+        fi
+    done
+    if [ ${curr_branch_name} == ${master_ref} ]; then
+        git pull
+    fi
+}
+
+_set_curr_branch
+
+if [ $# == 0 ]; then
+    _freshen
+elif [ $# == 1 ]; then
+    git status | grep 'modified:' > /dev/null
+    if [ $? -eq 0 ]; then
+        echo "You have modified files in branch '${curr_branch_name}'."
+        git stash || (echo "Failed to stash changes. Aborting." && exit 1)
+        skip_branches+=(${curr_branch_name})
+        echo "Stashed changes. Restore them using 'git stash pop' on branch ${curr_branch_name}."
+    fi
+    git checkout ${1} || (echo "'${1}' is not a branch." && exit 3)
+    _set_curr_branch
+    _freshen
+fi
+
