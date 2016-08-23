@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+# A simple git alias that allow cloning a repo by its name.
+# The search path of base repo URLs to try is specified using a
+# comma list of URLs in the GIT_FAVS environment variable.
+# For example if GIT_FAVS=https://github.com/a/,https://github.com/b/
+# and 'git fav myrepo' is run, https://github.com/a/myrepo will be tried
+# followed by https://github.com/b/myrepo
+
+
+if [ $# != 1 ]; then
+    echo "Usage: git fav <repo>"
+    exit 1
+fi
+
+_REPOS=()
+
+while IFS=',' read -ra repos; do
+    for repo in "${repos[@]}"; do
+        if [[ ${repo} == '' ]]; then
+            continue
+        fi
+        if [[ ${repo} != */ ]]; then
+            repo=${repo}/
+        fi
+        _REPOS+=(${repo})
+    done
+done <<< ${GIT_FAVS:-''}
+
+
+if [ ${#_REPOS[@]} -eq 0 ]; then
+    echo "No favs! Set your favs using a comma list with env variable GIT_FAVS"
+    echo "For example:"
+    echo "export GIT_FAVS=https://github.com/openstack/,https://github.com/openstack-dev/"
+    exit 1
+fi
+
+for repo in ${_REPOS[@]}; do
+    curl -s --head "${repo}${1}" | head -n 1 | grep 200 > /dev/null
+    if [ $? -eq 0 ]; then
+        git clone ${repo}${1} || (echo "Failed to clone!" && exit 2)
+        exit 0
+    fi
+done
+
+echo "Unable to find '${1}' in favs: ${GIT_FAVS}"
+exit 3

@@ -9,6 +9,6 @@ A set of git aliases to assist with OpenStack development related workflows.
 3. Create a git alias for each:
 
 ```
-git config --global alias.osclone '!osclone'
+git config --global alias.fav '!fav'
 git config --global alias.fresh '!fresh'
 ```
